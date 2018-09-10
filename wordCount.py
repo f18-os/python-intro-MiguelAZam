@@ -41,7 +41,6 @@ checkFile("wordCount.py")
 checkFile(inputFile)
 
 wordsOrd = makeDict(inputFile)
+del wordsOrd['']
 
 createFile(outputFile, wordsOrd)
-
-#print(methodOrd.keys())
