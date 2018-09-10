@@ -18,13 +18,14 @@ def makeDict(inputFile):
     with open(inputFile, "r") as inputOpen:
         for line in inputOpen:
             line = line.strip().lower()
+            line = re.sub('[-\']', ' ', line)
             line = re.sub('[^A-Za-z ]+', '', line)
             line = line.split(" ")
             for word in line:
-                if not words.has_key(word):
-                    words[word] = 1
-                else:
+                if word in words:
                     words[word] = words[word] + 1
+                else:
+                    words[word] = 1
     return collections.OrderedDict(sorted(words.items()))
 
 def createFile(outputFile, wordsDict):
