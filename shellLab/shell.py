@@ -5,16 +5,23 @@ import subprocess
 import collections
 
 def isCommand(cmd):
-    files = os.listdir('./bin')
+    binPath = './shellBin'
+    files = os.listdir(binPath)
+    cmdPath = ''
     for file in files:
-        file = file.split('.')
-        if cmd == file[0]:
-            return True
-    return False
+        fullName = file.split('-')[1]
+        cmdName = fullName.split('.')[0]
+        if cmd == cmdName:
+            cmdPath = binPath + '/' + file
+            return cmdPath, True
+    return cmdPath, False
 
 while(True):
     cmd = input(os.getcwd() + "# ")
     if cmd == "exit":
         break
-    if(isCommand(cmd)):
-        print("Hi")
+    path, isCmd = isCommand(cmd)
+    if(isCmd):
+        subprocess.call(['python3', path])
+    else:
+        print("Command doesn't exist! Try again.")
