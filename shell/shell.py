@@ -5,25 +5,43 @@ import os
 import re
 import subprocess
 import collections
+import tokenize
 
-def isCommand(cmd):
-    binPath = './shellBin'
-    files = os.listdir(binPath)
-    cmdPath = ''
-    for file in files:
-        fullName = file.split('-')[1]
-        cmdName = fullName.split('.')[0]
-        if cmd == cmdName:
-            cmdPath = binPath + '/' + file
-            return cmdPath, True
-    return cmdPath, False    
+os.environ["PS1"] = "$"
 
-while(True):
-    cmd = input(os.getcwd() + "# ")
-    if cmd == "exit":
-        break
-    path, isCmd = isCommand(cmd)
-    if(isCmd):
-        subprocess.call(['python3', path])
+def runCmd(cmd):
+    rc = os.fork()
+
+    if rc<0:
+        os.write(2, ("Fork failed, returning %d\n" % rc).encode())
+    elif rc==0:
+        try:
+            os.execve(cmd[0], cmd, os.environ)
+        except FileNotFoundError:
+            pass
+        for dir in re.split(':', os.environ["PATH"]):
+            prgm = "/%s/%s" % (dir, cmd[0])
+            try:
+                os.execve(prgm, cmd, os.environ)
+            except FileNotFoundError:
+                pass
+        os.write(2, ("Command not found").encode())
     else:
-        print("Command doesn't exist! Try again.")
+        os.wait()
+    return
+
+def main():
+    while(True):
+        try:
+            cmd = input()
+            cmd = re.sub(' +', ' ', cmd)
+            cmd = cmd.split(' ')
+            if(cmd[0] == 'exit'):
+                exit()
+            if(len(cmd)<2 and cmd[0] != ''):
+                runCmd(cmd)
+        except EOFError:
+            exit()
+
+
+main()
