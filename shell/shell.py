@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import os
 import re
@@ -14,7 +16,7 @@ def isCommand(cmd):
         if cmd == cmdName:
             cmdPath = binPath + '/' + file
             return cmdPath, True
-    return cmdPath, False
+    return cmdPath, False    
 
 while(True):
     cmd = input(os.getcwd() + "# ")
