@@ -18,7 +18,7 @@ def runCmd(cmd):
     for dir in re.split(":", os.environ['PATH']):
         prgm = "%s/%s" % (dir, cmd[0])
         execCmd(prgm, cmd, os.environ)
-    os.write(2, ("Child error: Could not exec %s \n" % myOut[0]).encode())
+    os.write(2, ("Child error: Could not exec %s \n" % cmd[0]).encode())
     sys.exit()
 
 def checkForFork(cmd):
@@ -59,11 +59,37 @@ def check(cmd):
         return False
     return True
 
+def startPipe(pcmd, scmd):
+    r, w = os.pipe()
+    scnd = False
+
+    for cmd in (pcmd, scmd):
+        pid = os.fork()
+
+        if(pid<0):
+            os.write(1, ("Fork failed. \n").encode())
+            sys.exit()
+        elif(pid==0):
+            if(scnd):
+               os.close(w)
+               os.dup2(r,0)
+            else:
+                os.close(r)
+                os.dup2(w, 1)
+            runCmd(cmd)
+        else:
+            os.dup2(1,w)
+            os.wait()
+        scnd = True
+    
 def startFork(pcmd, scmd, char):
+    if(char == '|'):
+        startPipe(pcmd, scmd)
+        return
     pid = os.fork()
 
     if(pid<0):
-        print("Fork failed!")
+        os.write(1, ("Fork failed. \n").encode())
         sys.exit(1)
     elif(pid==0):
         if(char=='>'):
@@ -72,14 +98,16 @@ def startFork(pcmd, scmd, char):
             os.set_inheritable(1, True)
         runCmd(pcmd)
     else:
-        os.wait()
+        if(char != '&'):
+            os.wait()
             
 
 #Main method that consist of taking the input of the user and tokenize the string
 def main():
     while(True):
         try:
-            cmd = input(os.environ['PS1'] + " ") #Wait for input
+            os.write(1, (os.environ['PS1']).encode())
+            cmd = input() #Wait for input
             cmd, char = checkForFork(cmd)
             pcmd = preprocess(cmd[0])
             scmd = ''
