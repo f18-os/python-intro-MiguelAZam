@@ -3,7 +3,6 @@
 import sys
 import os
 import re
-import subprocess
 
 os.environ["PS1"] = "$"
 
@@ -15,76 +14,82 @@ def execCmd(prgm, cmd, env):
     return
 
 def runCmd(cmd):
-    rc = os.fork()
+    execCmd(cmd[0], cmd, os.environ)
+    for dir in re.split(":", os.environ['PATH']):
+        prgm = "%s/%s" % (dir, cmd[0])
+        execCmd(prgm, cmd, os.environ)
+    os.write(2, ("Child error: Could not exec %s \n" % myOut[0]).encode())
+    sys.exit()
 
-    if rc<0:
-        os.write(2, ("Fork failed, returning %d\n" % rc).encode())
-    elif rc==0:
-        execCmd(cmd[0], cmd, os.environ)
-        for dir in re.split(':', os.environ["PATH"]):
-            prgm = "/%s/%s" % (dir, cmd[0])
-            execCmd(prgm, cmd, os.environ)
-        os.write(2, ("Command not found\n").encode())
-    else:
-        os.wait()
-    return
-
-def checkIORed(cmd):
-    if '>' in cmd:
+def checkForFork(cmd):
+    char = ''
+    if('>' in cmd):
         cmd = cmd.split('>')
-        runRedir(cmd)
-    elif '|' in cmd:
+        char = '>'
+    elif('|' in cmd):
         cmd = cmd.split('|')
-        runPipe(cmd)
+        char = '|'
+    elif('&' in cmd):
+        cmd = cmd.split('&')
+        char = '&'
     else:
-        cmd = cmd.split(' ')
-        runCmd(cmd)
-    return
+        cmd = [cmd]
+    return cmd, char
 
-def startFork():
-    r, w = os.pipe()
-    pid = os.fork()
-    if pid<0:
-        os.write(2, ("Fork failed, returing %d\n" % pid).encode())
-    return r, w, pid
+def preprocess(command):
+    command = re.sub(' +', ' ', command)
+    command = command.split(' ')
+    empty = []
+    for i in range(len(command)):
+        command[i] = command[i].strip(' ')
+        if command[i] == '':
+            empty.append(i)
+    for i in range(len(empty)):
+        del command[empty[i]]
+    return command
 
-def runRedir(cmd):
-    r, w, pid = startFork()
-    if pid==0:
-        myOut = cmd[0].split(' ')
-        os.close(1)
-        sys.stdout = open(cmd[1], "w")
-        fd = sys.stdout.fileno()
-        os.set_inheritable(fd, True)
-        execCmd(myOut[0], myOut, os.environ)
-        for dir in re.split(":", os.environ['PATH']):
-            prgm = "%s/%s" % (dir, myOut[0])
-            execCmd(prgm, myOut, os.environ)
-        os.write(2, ("Child error: Could not exec %s \n" % myOut[0]).encode())
+def check(cmd):
+    if(cmd[0]=='exit'):
         sys.exit()
+    elif(cmd[0]=='cd'):
+        try:
+            os.chdir(cmd[1])
+        except IndexError:
+            os.write(2, ("Directory doesn't exist.\n").encode())
+        return False
+    return True
+
+def startFork(pcmd, scmd, char):
+    pid = os.fork()
+
+    if(pid<0):
+        print("Fork failed!")
+        sys.exit(1)
+    elif(pid==0):
+        if(char=='>'):
+            os.close(1)
+            sys.stdout = open(scmd[0], 'w')
+            os.set_inheritable(1, True)
+        runCmd(pcmd)
     else:
         os.wait()
-    return
-        
+            
 
 #Main method that consist of taking the input of the user and tokenize the string
 def main():
     while(True):
         try:
             cmd = input(os.environ['PS1'] + " ") #Wait for input
-            cmd = re.sub(' +', ' ', cmd) #Delete extra spaces
-            cmdSplit = cmd.split(' ')
-            if(cmdSplit[0]=='exit'):
-                exit()
-            if(len(cmdSplit)<2 and cmdSplit[0]==''):
-                continue
-            checkIORed(cmd)
+            cmd, char = checkForFork(cmd)
+            pcmd = preprocess(cmd[0])
+            scmd = ''
+            if(len(cmd)==2):
+                scmd = preprocess(cmd[1])
+            if(check(pcmd)):
+                startFork(pcmd, scmd, char)
         #Catch EOFError
         except EOFError:
-            exit()
+            sys.exit()
     return
 
-
 main()
-
-
